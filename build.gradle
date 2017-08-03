@@ -1,0 +1,20 @@
+group 'org.interactiverobotics'
+version '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+
+    flatDir {
+        dirs '3rd-party/jax-ws'
+    }
+}
+
+dependencies {
+    compile name: 'vboxjws'
+
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
