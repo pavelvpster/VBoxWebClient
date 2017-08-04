@@ -20,6 +20,9 @@
 
 package org.interactiverobotics.vbox_web_client;
 
+import org.virtualbox_5_1.IMachine;
+import org.virtualbox_5_1.IProgress;
+import org.virtualbox_5_1.ISession;
 import org.virtualbox_5_1.IVirtualBox;
 import org.virtualbox_5_1.SessionState;
 import org.virtualbox_5_1.VirtualBoxManager;
@@ -31,8 +34,8 @@ import org.virtualbox_5_1.VirtualBoxManager;
  */
 public final class Main {
 
-    private static final String USERNAME = "";
-    private static final String PASSWORD = "";
+    private static final String OK = "OK";
+    private static final String ERROR = "ERROR";
 
 
     /**
@@ -47,16 +50,23 @@ public final class Main {
         }
         final String connectionString = args[0];
         final String command = args[1];
+        String parameter = null;
+        if (args.length > 2) {
+            parameter = args[2];
+        }
 
         final VirtualBoxManager manager = VirtualBoxManager.createInstance(null);
         try {
-            manager.connect(connectionString, USERNAME, PASSWORD);
+            manager.connect(connectionString, "", "");
             switch (command) {
                 case "list":
                     list(manager.getVBox());
                     break;
                 case "list-running":
                     listRunning(manager.getVBox());
+                    break;
+                case "run":
+                    run(manager, manager.getVBox(), parameter);
                     break;
                 default:
                     System.err.println("Unsupported command '" + command + "'");
@@ -68,12 +78,45 @@ public final class Main {
 
 
     private static void list(final IVirtualBox vbox) {
-        vbox.getMachines().forEach(machine -> System.out.println(machine.getName()));
+        vbox.getMachines().forEach(Main::printMachineName);
     }
 
     private static void listRunning(final IVirtualBox vbox) {
         vbox.getMachines().stream()
-                .filter(machine -> !SessionState.Unlocked.equals(machine.getSessionState()))
-                .forEach(machine -> System.out.println(machine.getName()));
+                .filter(Main::isMachineRunning)
+                .forEach(Main::printMachineName);
+    }
+
+    private static void printMachineName(final IMachine machine) {
+        System.out.println(machine.getName());
+    }
+
+    private static boolean isMachineRunning(final IMachine machine) {
+        return !SessionState.Unlocked.equals(machine.getSessionState());
+    }
+
+    private static void run(final VirtualBoxManager manager, final IVirtualBox vbox, final String machineName) {
+        if (machineName == null || machineName.isEmpty()) {
+            System.out.println(ERROR);
+            return;
+        }
+
+        final IMachine machine = vbox.findMachine(machineName);
+        if (machine == null) {
+            System.out.println(ERROR);
+            return;
+        }
+
+        if (isMachineRunning(machine)) {
+            System.out.println(OK);
+            return;
+        }
+
+        final ISession session = manager.getSessionObject();
+        final IProgress progress = machine.launchVMProcess(session, "gui", "");
+        progress.waitForCompletion(-1);
+        session.unlockMachine();
+
+        System.out.println(OK);
     }
 }
