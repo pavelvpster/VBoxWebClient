@@ -13,3 +13,5 @@ fi
 mkdir "${DEST}"
 
 cp -a build/libs/*.jar "${DEST}"
+
+cp -a 3rd-party/jax-ws/vboxjws.jar "${DEST}"
