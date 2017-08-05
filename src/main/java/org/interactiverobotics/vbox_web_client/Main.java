@@ -27,6 +27,10 @@ import org.virtualbox_5_1.IVirtualBox;
 import org.virtualbox_5_1.SessionState;
 import org.virtualbox_5_1.VirtualBoxManager;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Main application class.
  *
@@ -50,9 +54,9 @@ public final class Main {
         }
         final String connectionString = args[0];
         final String command = args[1];
-        String parameter = null;
-        if (args.length > 2) {
-            parameter = args[2];
+        final List<String> parameters = new ArrayList<>();
+        for (int i = 2; i < args.length; i++) {
+            parameters.add(args[i]);
         }
 
         final VirtualBoxManager manager = VirtualBoxManager.createInstance(null);
@@ -66,7 +70,8 @@ public final class Main {
                     listRunning(manager.getVBox());
                     break;
                 case "run":
-                    run(manager, manager.getVBox(), parameter);
+                    run(manager, manager.getVBox(),
+                            getStringParameter(parameters, 0), getLongParameter(parameters, 1));
                     break;
                 default:
                     System.err.println("Unsupported command '" + command + "'");
@@ -95,13 +100,32 @@ public final class Main {
         return !SessionState.Unlocked.equals(machine.getSessionState());
     }
 
-    private static void run(final VirtualBoxManager manager, final IVirtualBox vbox, final String machineName) {
-        if (machineName == null || machineName.isEmpty()) {
+    private static Optional<String> getStringParameter(final List<String> parameters, int index) {
+        if (index < 0 || index >= parameters.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(parameters.get(index));
+    }
+
+    private static Optional<Long> getLongParameter(final List<String> parameters, int index) {
+        return getStringParameter(parameters, index)
+                .flatMap(t -> {
+                    try {
+                        return Optional.of(Long.parseLong(t));
+                    } catch (final NumberFormatException e) {
+                        return Optional.empty();
+                    }
+                });
+    }
+
+    private static void run(final VirtualBoxManager manager, final IVirtualBox vbox,
+                            final Optional<String> machineName, final Optional<Long> memoryLimit) {
+        if (!machineName.isPresent()) {
             System.out.println(ERROR);
             return;
         }
 
-        final IMachine machine = vbox.findMachine(machineName);
+        final IMachine machine = vbox.findMachine(machineName.get());
         if (machine == null) {
             System.out.println(ERROR);
             return;
@@ -110,6 +134,18 @@ public final class Main {
         if (isMachineRunning(machine)) {
             System.out.println(OK);
             return;
+        }
+
+        if (memoryLimit.isPresent()) {
+            final long memoryUsed = vbox.getMachines().stream()
+                    .filter(Main::isMachineRunning)
+                    .map(IMachine::getMemorySize)
+                    .mapToLong(Long::longValue)
+                    .sum();
+            if (memoryUsed + machine.getMemorySize() >= memoryLimit.get()) {
+                System.out.println(ERROR);
+                return;
+            }
         }
 
         final ISession session = manager.getSessionObject();
