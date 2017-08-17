@@ -48,6 +48,12 @@ public final class Main {
      * @param args command line arguments
      */
     public static void main(final String[] args) {
+
+        if (args.length == 1 && "ping".equals(args[0])) {
+            System.out.println(OK);
+            return;
+        }
+
         if (args.length < 2) {
             System.err.println("Not enough arguments!");
             return;
@@ -76,6 +82,8 @@ public final class Main {
                 default:
                     System.err.println("Unsupported command '" + command + "'");
             }
+        } catch (final Exception e) {
+            System.out.println(ERROR);
         } finally {
             manager.cleanup();
         }
